@@ -1,3 +1,4 @@
 pandas
 boto3
 great_expectations
+pyarrow

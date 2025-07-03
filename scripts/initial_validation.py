@@ -16,7 +16,7 @@ LOG_PREFIX = "validation-logs/"
 # ---------- Schema Definitions ----------
 REQUIRED_COLUMNS = {
     "products": ["id", "category"],
-    "orders": ["order_id", "user_id", "status", "created_at", "returned_at", "num_of_item"],
+    "orders": ["order_id", "user_id", "status", "created_at", "num_of_item"],
     "order_items": ["id", "order_id", "user_id", "product_id", "status", "created_at", "sale_price"]
 }
 
@@ -41,31 +41,41 @@ def upload_log_to_s3(log_content, filename):
 # ---------- Validation Function ----------
 
 def validate_chunk(df: pd.DataFrame, data_type: str, chunk_idx: int, file_key: str):
-    df = df[[col for col in REQUIRED_COLUMNS[data_type] if col in df.columns]].copy()  # <-- add .copy() here
+    required_cols = REQUIRED_COLUMNS[data_type]
+    df = df[[col for col in required_cols if col in df.columns]].copy()
+    conversion_issues = []
 
-    # Convert to expected types
-    if 'created_at' in df.columns:
-        df.loc[:, 'created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
-    if 'returned_at' in df.columns:
-        df.loc[:, 'returned_at'] = pd.to_datetime(df['returned_at'], errors='coerce')
-    
-    for col in ['id', 'order_id', 'user_id', 'product_id', 'num_of_item']:
-        if col in df.columns:
-            df.loc[:, col] = pd.to_numeric(df[col], errors='coerce')
+    # Parse datetime columns
+    for date_col in ['created_at']:
+        if date_col in df.columns:
+            df.loc[:, date_col] = pd.to_datetime(df[date_col], errors='coerce')
+            na_count = df[date_col].isna().sum()
+            if na_count > 0:
+                conversion_issues.append(f"{na_count} null(s) after datetime parse in column '{date_col}'")
 
-    if 'sale_price' in df.columns:
-        df.loc[:, 'sale_price'] = pd.to_numeric(df['sale_price'], errors='coerce')
+    # Parse numeric columns
+    for num_col in ['id', 'order_id', 'user_id', 'product_id', 'num_of_item', 'sale_price']:
+        if num_col in df.columns:
+            df.loc[:, num_col] = pd.to_numeric(df[num_col], errors='coerce')
+            na_count = df[num_col].isna().sum()
+            if na_count > 0:
+                conversion_issues.append(f"{na_count} null(s) after numeric parse in column '{num_col}'")
 
-    # Separate valid/invalid rows
-    invalid_rows = df[df.isnull().any(axis=1)]
-    valid_rows = df.dropna()
+    # Detect invalid rows based on required columns only
+    invalid_mask = df[required_cols].isnull().any(axis=1)
+    invalid_rows = df[invalid_mask]
+    valid_rows = df[~invalid_mask]
 
     if not invalid_rows.empty:
         quarantine_key = f"{QUARANTINED_PREFIX}{data_type}/{os.path.basename(file_key).replace('.csv','')}_chunk{chunk_idx}.csv"
         csv_buffer = StringIO()
         invalid_rows.to_csv(csv_buffer, index=False)
         s3.put_object(Bucket=LANDING_BUCKET, Key=quarantine_key, Body=csv_buffer.getvalue())
-        logging.warning(f"Chunk {chunk_idx}: {len(invalid_rows)} row(s) quarantined to s3://{LANDING_BUCKET}/{quarantine_key}")
+
+        reason = "; ".join(conversion_issues) if conversion_issues else "Missing values in required columns"
+        logging.warning(
+            f"Chunk {chunk_idx}: {len(invalid_rows)} row(s) quarantined to s3://{LANDING_BUCKET}/{quarantine_key} due to: {reason}"
+        )
 
     if valid_rows.empty:
         logging.warning(f"Chunk {chunk_idx} of {file_key} has no valid rows")
@@ -77,15 +87,19 @@ def validate_chunk(df: pd.DataFrame, data_type: str, chunk_idx: int, file_key: s
 # ---------- Batch Processing ----------
 
 def process_file_in_chunks(file_key: str, data_type: str):
-    s3_obj = s3.get_object(Bucket=LANDING_BUCKET, Key=file_key)
-    chunk_iter = pd.read_csv(s3_obj['Body'], chunksize=CHUNK_SIZE)
-    all_chunks_valid = True
-    for i, chunk in enumerate(chunk_iter):
-        chunk.columns = [c.strip() for c in chunk.columns]
-        success = validate_chunk(chunk, data_type, i, file_key)
-        if not success:
-            all_chunks_valid = False
-    return all_chunks_valid
+    try:
+        s3_obj = s3.get_object(Bucket=LANDING_BUCKET, Key=file_key)
+        chunk_iter = pd.read_csv(s3_obj['Body'], chunksize=CHUNK_SIZE)
+        all_chunks_valid = True
+        for i, chunk in enumerate(chunk_iter):
+            chunk.columns = [c.strip() for c in chunk.columns]
+            success = validate_chunk(chunk, data_type, i, file_key)
+            if not success:
+                all_chunks_valid = False
+        return all_chunks_valid
+    except Exception as e:
+        logging.error(f"Failed to process chunks in {file_key}: {e}")
+        return False
 
 # ---------- Main Function ----------
 
@@ -97,20 +111,23 @@ def main():
         try:
             logging.info(f"Processing file: {key}")
             data_type = next((k for k in REQUIRED_COLUMNS if k in key), None)
+
             if not data_type:
-                logging.warning(f"Unknown file type: {key}")
+                logging.warning(f"Rejected file {key}: unknown data type (expected one of {list(REQUIRED_COLUMNS.keys())})")
                 move_file(key, REJECTED_PREFIX)
                 continue
 
             valid = process_file_in_chunks(key, data_type)
+
             if valid:
                 move_file(key, VALIDATED_PREFIX)
                 logging.info(f"Validation passed : {key}")
             else:
+                logging.warning(f"Rejected file {key}: one or more chunks failed validation")
                 move_file(key, REJECTED_PREFIX)
-                logging.warning(f"Validation failed : {key}")
+
         except Exception as e:
-            logging.error(f"Error processing {key}: {e}")
+            logging.error(f"Error processing file {key}: {e}")
             move_file(key, REJECTED_PREFIX)
 
     # Upload log to S3
