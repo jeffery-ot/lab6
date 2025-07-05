@@ -27,6 +27,8 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 RUN mkdir -p /opt/bitnami/spark/jars \
     && mkdir -p /opt/bitnami/spark/tmp \
     && chmod -R 777 /opt/bitnami/spark/tmp
+# Download Delta Lake JAR (choose version compatible with Spark 3.5)
+RUN curl -L -o /opt/bitnami/spark/jars/delta-core_2.12-2.4.0.jar https://repo1.maven.org/maven2/io/delta/delta-core_2.12/2.4.0/delta-core_2.12-2.4.0.jar
 
 # Set HOME to avoid Ivy issues
 ENV HOME=/tmp
