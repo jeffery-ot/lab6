@@ -14,7 +14,9 @@
         - SPARK_SSL_ENABLED=no
         - SPARK_USER=spark
         - HOME=/tmp
-        - AWS_PROFILE=default
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
       ports:
         - '8081:8080'
         - '7077:7077'
@@ -40,7 +42,9 @@
         - SPARK_SSL_ENABLED=no
         - SPARK_USER=spark
         - HOME=/tmp
-        - AWS_PROFILE=default
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
       depends_on:
         - spark
       volumes:
