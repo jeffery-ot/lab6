@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime
 
 # ---------- Configuration ----------
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_DIR = Path("/opt/spark/data")
 LANDING_BUCKET = "lab6-rawdata"
 LANDING_PREFIX = "landing-zone/"
 MAX_UPLOADS = 10
