@@ -1,47 +1,41 @@
 from pyspark.sql import SparkSession
-from config import configure_logging, upload_log_to_s3
+from config import configure_logging, ensure_s3_path_exists
 from utils import load_and_filter_data
-from transformation import compute_order_level_kpis, compute_category_level_kpis
+from kpi_calculations import compute_order_level_kpis, compute_category_level_kpis
+import logging
+
+ORDER_KPI_PATH = "s3a://lab6-presentation/order_kpis/"
+CATEGORY_KPI_PATH = "s3a://lab6-presentation/category_kpis/"
 
 def main():
+    spark = SparkSession.builder \
+        .appName("Order Metrics Pipeline") \
+        .getOrCreate()
+
     configure_logging()
-    import logging
     logger = logging.getLogger(__name__)
 
-    logger.info("Starting KPI pipeline...")
+    logger.info("Loading data and filtering to overlapping date range...")
+    orders, order_items, products = load_and_filter_data(spark)
 
-    try:
-        spark = SparkSession.builder \
-            .appName("KPI Metrics Pipeline") \
-            .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-            .getOrCreate()
+    logger.info("Registering temp views for SQL use...")
+    orders.createOrReplaceTempView("orders")
+    order_items.createOrReplaceTempView("order_items")
+    products.createOrReplaceTempView("products")
 
-        orders, order_items, products = load_and_filter_data(spark)
+    logger.info("Computing order-level KPIs...")
+    order_kpis = compute_order_level_kpis(spark)
+    ensure_s3_path_exists(ORDER_KPI_PATH)
+    order_kpis.write.mode("overwrite").parquet(ORDER_KPI_PATH)
+    logger.info(f"Order-level KPIs written to {ORDER_KPI_PATH}")
 
-        orders.createOrReplaceTempView("orders")
-        order_items.createOrReplaceTempView("order_items")
-        products.createOrReplaceTempView("products")
+    logger.info("Computing category-level KPIs...")
+    category_kpis = compute_category_level_kpis(spark)
+    ensure_s3_path_exists(CATEGORY_KPI_PATH)
+    category_kpis.write.mode("overwrite").parquet(CATEGORY_KPI_PATH)
+    logger.info(f"Category-level KPIs written to {CATEGORY_KPI_PATH}")
 
-        logger.info("Computing order-level KPIs...")
-        order_kpis = compute_order_level_kpis(spark)
-        order_kpis.show()
-        order_kpis.write.mode("overwrite").format("parquet") \
-            .save("s3a://lab6-presentation/order_kpis")
-
-        logger.info("Computing category-level KPIs...")
-        category_kpis = compute_category_level_kpis(spark)
-        category_kpis.show()
-        category_kpis.write.mode("overwrite").format("parquet") \
-            .save("s3a://lab6-presentation/category_kpis")
-
-        logger.info("KPI pipeline completed successfully.")
-
-    except Exception as e:
-        logger.exception("KPI pipeline failed.")
-        raise
-    finally:
-        upload_log_to_s3()
+    logger.info("Pipeline execution completed.")
 
 if __name__ == "__main__":
     main()
