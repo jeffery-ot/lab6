@@ -15,25 +15,29 @@ def main():
     configure_logging()
     logger = logging.getLogger(__name__)
 
-    logger.info("Loading data and filtering to overlapping date range...")
+    logger.info("Loading staged Delta data...")
     orders, order_items, products = load_and_filter_data(spark)
 
-    logger.info("Registering temp views for SQL use...")
-    orders.createOrReplaceTempView("orders")
-    order_items.createOrReplaceTempView("order_items")
-    products.createOrReplaceTempView("products")
+    if orders is not None and order_items is not None:
+        logger.info("Computing order-level KPIs...")
+        orders.createOrReplaceTempView("orders")
+        order_items.createOrReplaceTempView("order_items")
+        order_kpis = compute_order_level_kpis(spark)
+        ensure_s3_path_exists(ORDER_KPI_PATH)
+        order_kpis.write.mode("overwrite").parquet(ORDER_KPI_PATH)
+        logger.info(f"Order-level KPIs written to {ORDER_KPI_PATH}")
+    else:
+        logger.warning("Skipping order-level KPIs due to missing data.")
 
-    logger.info("Computing order-level KPIs...")
-    order_kpis = compute_order_level_kpis(spark)
-    ensure_s3_path_exists(ORDER_KPI_PATH)
-    order_kpis.write.mode("overwrite").parquet(ORDER_KPI_PATH)
-    logger.info(f"Order-level KPIs written to {ORDER_KPI_PATH}")
-
-    logger.info("Computing category-level KPIs...")
-    category_kpis = compute_category_level_kpis(spark)
-    ensure_s3_path_exists(CATEGORY_KPI_PATH)
-    category_kpis.write.mode("overwrite").parquet(CATEGORY_KPI_PATH)
-    logger.info(f"Category-level KPIs written to {CATEGORY_KPI_PATH}")
+    if orders is not None and order_items is not None and products is not None:
+        logger.info("Computing category-level KPIs...")
+        products.createOrReplaceTempView("products")
+        category_kpis = compute_category_level_kpis(spark)
+        ensure_s3_path_exists(CATEGORY_KPI_PATH)
+        category_kpis.write.mode("overwrite").parquet(CATEGORY_KPI_PATH)
+        logger.info(f"Category-level KPIs written to {CATEGORY_KPI_PATH}")
+    else:
+        logger.warning("Skipping category-level KPIs due to missing data.")
 
     logger.info("Pipeline execution completed.")
 
