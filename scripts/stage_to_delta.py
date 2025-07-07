@@ -118,11 +118,11 @@ def detect_data_type(df_columns: set) -> str:
     logger.debug(f"Detecting data type for columns: {sorted(df_columns)}")
     for dtype, required_cols in REQUIRED_COLUMNS.items():
         if required_cols.issubset(df_columns):
-            logger.debug(f"✓ Matched {dtype}")
+            logger.debug(f" Matched {dtype}")
             return dtype
         else:
             missing = required_cols - df_columns
-            logger.debug(f"✗ {dtype}: missing {missing}")
+            logger.debug(f" {dtype}: missing {missing}")
     logger.warning("No matching data type found")
     return None
 
