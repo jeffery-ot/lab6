@@ -10,7 +10,7 @@ def compute_order_level_kpis(spark):
             ROUND(SUM(CASE WHEN o.status = 'returned' THEN 1 ELSE 0 END) / COUNT(DISTINCT o.order_id) * 100, 2) AS return_rate
         FROM orders o
         INNER JOIN order_items oi ON o.order_id = oi.order_id
-        GROUP BY o.order_date
+        GROUP BY o.created_at_date
     """)
 
 def compute_category_level_kpis(spark):
@@ -24,5 +24,5 @@ def compute_category_level_kpis(spark):
         FROM order_items oi
         INNER JOIN orders o ON oi.order_id = o.order_id
         INNER JOIN products p ON oi.product_id = p.id
-        GROUP BY p.category, oi.order_date
+        GROUP BY p.category, oi.created_at_date
     """)
