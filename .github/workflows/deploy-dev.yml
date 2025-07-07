@@ -56,32 +56,32 @@ jobs:
         run: >
           docker exec spark-master pip install -r /opt/spark/scripts/../requirements.txt
 
-      # - name: Step 1 - Run file_generator.py
-      #   run: >
-      #     docker exec
-      #     -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
-      #     spark-master
-      #     spark-submit /opt/spark/scripts/file_generator.py
+      - name: Step 1 - Run file_generator.py
+        run: >
+          docker exec
+          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+          spark-master
+          spark-submit /opt/spark/scripts/file_generator.py
 
-      # - name: Step 2 - Run initial_validation.py
-      #   run: >
-      #     docker exec
-      #     -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
-      #     spark-master
-      #     spark-submit /opt/spark/scripts/initial_validation.py
+      - name: Step 2 - Run initial_validation.py
+        run: >
+          docker exec
+          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+          spark-master
+          spark-submit /opt/spark/scripts/initial_validation.py
 
-      # - name: Step 3 - Run stage_to_delta.py
-      #   run: >
-      #     docker exec
-      #     -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
-      #     spark-master
-      #     spark-submit /opt/spark/scripts/stage_to_delta.py
+      - name: Step 3 - Run stage_to_delta.py
+        run: >
+          docker exec
+          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+          spark-master
+          spark-submit /opt/spark/scripts/stage_to_delta.py
 
 
       - name: Step 3 - Run kpi Computations
