@@ -4,6 +4,8 @@ import boto3
 from urllib.parse import urlparse
 from datetime import datetime
 import io
+from delta.tables import DeltaTable
+from pyspark.sql.functions import col
 
 def configure_logging():
     """Configure logging for the application"""
@@ -104,12 +106,33 @@ def cleanup_s3_placeholder(s3a_uri):
         logger.warning(f"Failed to cleanup placeholder for {s3a_uri}: {e}")
 
 
-def archive_to_s3(df, partition_column, table_name):
-    output_path = f"s3a://lab6-curated/archives/{table_name}"
+
+
+def archive_to_s3(df, partition_column, output_path, staging_path=None):
+    """
+    Archive only the partition(s) from staging that were used in df.
+    """
+    logger = logging.getLogger(__name__)
     try:
-        ensure_s3_path_exists(output_path)
+        # Step 1: Write to archive path
         df.write.partitionBy(partition_column).mode("overwrite").format("delta").save(output_path)
-        cleanup_s3_placeholder(output_path)
-        logging.getLogger().info(f"Archived {table_name} to {output_path}")
+        logger.info(f"Archived data to {output_path}")
+
+        # Step 2: Delete only affected partitions from staging
+        if staging_path:
+            partition_values = df.select(partition_column).distinct().rdd.flatMap(lambda x: x).collect()
+            if not partition_values:
+                logger.warning(f"No partition values found in DataFrame for {partition_column}")
+                return
+
+            delta_table = DeltaTable.forPath(df._jdf.sparkSession(), staging_path)
+
+            for val in partition_values:
+                logger.info(f"Deleting partition {partition_column} = {val} from {staging_path}")
+                delta_table.delete(condition=col(partition_column) == val)
+
+            logger.info(f"Deleted {len(partition_values)} partition(s) from staging path {staging_path}")
+
     except Exception as e:
-        logging.getLogger().warning(f"Archiving failed for {table_name}: {str(e)}")
+        logger.error(f"Failed to archive and clean staging: {e}")
+

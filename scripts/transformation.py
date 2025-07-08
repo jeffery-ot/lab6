@@ -172,14 +172,20 @@ def process_order_kpis(spark, s3_path, dynamodb_table_name):
             logger.error("Failed to write order KPIs to DynamoDB")
             return None
 
-        #  Archive to S3
-        archive_to_s3(order_kpis, "order_date", "order_kpis")
+        # Archive newly computed data and clean up from staging
+        archive_to_s3(
+            df=order_kpis,
+            partition_column="order_date",
+            output_path="s3a://lab6-curated/archives/order_kpis/",
+            staging_path=s3_path
+        )
 
         logger.info("Order-level KPIs processing completed successfully")
         return order_kpis
     except Exception as e:
         logger.error(f"Error processing order KPIs: {str(e)}")
         return None
+
 
 def process_category_kpis(spark, s3_path, dynamodb_table_name):
     logger = logging.getLogger(__name__)
@@ -199,11 +205,17 @@ def process_category_kpis(spark, s3_path, dynamodb_table_name):
             logger.error("Failed to write category KPIs to DynamoDB")
             return None
 
-        # Archive to S3
-        archive_to_s3(category_kpis, "order_date", "category_kpis")
+    
+        archive_to_s3(
+            df=category_kpis,
+            partition_column="order_date",
+            output_path="s3a://lab6-curated/archives/category_kpis/",
+            staging_path=s3_path
+        )
 
         logger.info("Category-level KPIs processing completed successfully")
         return category_kpis
     except Exception as e:
         logger.error(f"Error processing category KPIs: {str(e)}")
         return None
+
