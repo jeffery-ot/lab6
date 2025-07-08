@@ -102,3 +102,14 @@ def cleanup_s3_placeholder(s3a_uri):
         
     except Exception as e:
         logger.warning(f"Failed to cleanup placeholder for {s3a_uri}: {e}")
+
+
+def archive_to_s3(df, partition_column, table_name):
+    output_path = f"s3a://lab6-curated/archives/{table_name}"
+    try:
+        ensure_s3_path_exists(output_path)
+        df.write.partitionBy(partition_column).mode("overwrite").format("delta").save(output_path)
+        cleanup_s3_placeholder(output_path)
+        logging.getLogger().info(f"Archived {table_name} to {output_path}")
+    except Exception as e:
+        logging.getLogger().warning(f"Archiving failed for {table_name}: {str(e)}")
