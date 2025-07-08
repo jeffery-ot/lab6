@@ -3,8 +3,8 @@ def compute_order_level_kpis(spark):
         SELECT
             o.created_at_date AS order_date,
             COUNT(DISTINCT o.order_id) AS total_orders,
-            SUM(CAST(oi.sale_price AS DOUBLE)) AS total_revenue,
-            SUM(CAST(o.num_of_item AS DOUBLE)) AS total_items_sold,
+            ROUND(SUM(CAST(oi.sale_price AS DOUBLE)),2) AS total_revenue,
+            SUM(CAST(o.num_of_item AS INT) AS total_items_sold,
             COUNT(DISTINCT o.user_id) AS unique_customers,
             SUM(CASE WHEN o.status = 'returned' THEN 1 ELSE 0 END) AS returned_orders,
             ROUND(
