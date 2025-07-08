@@ -3,8 +3,8 @@ def compute_order_level_kpis(spark):
         SELECT
             o.created_at_date AS order_date,
             COUNT(DISTINCT o.order_id) AS total_orders,
-            ROUND(SUM(CAST(oi.sale_price AS DOUBLE)),2) AS total_revenue,
-            SUM(CAST(o.num_of_item AS INT) AS total_items_sold,
+            ROUND(SUM(CAST(oi.sale_price AS DOUBLE)), 2) AS total_revenue,
+            SUM(CAST(o.num_of_item AS INT)) AS total_items_sold,
             COUNT(DISTINCT o.user_id) AS unique_customers,
             SUM(CASE WHEN o.status = 'returned' THEN 1 ELSE 0 END) AS returned_orders,
             ROUND(
@@ -19,15 +19,13 @@ def compute_order_level_kpis(spark):
             o.created_at_date
     """)
 
-
-
 def compute_category_level_kpis(spark):
     return spark.sql("""
         SELECT
             p.category,
             o.created_at_date AS order_date,
             ROUND(SUM(CAST(oi.sale_price AS DOUBLE)), 2) AS daily_revenue,
-            ROUND(SUM(CAST(oi.sale_price AS DOUBLE), 2) / COUNT(DISTINCT oi.order_id), 2) AS avg_order_value,
+            ROUND(SUM(CAST(oi.sale_price AS DOUBLE)) / COUNT(DISTINCT oi.order_id), 2) AS avg_order_value,
             ROUND(
                 SUM(CASE WHEN oi.status = 'returned' THEN 1 ELSE 0 END) / COUNT(*) * 100, 2
             ) AS avg_return_rate
