@@ -1,0 +1,137 @@
+name: data_pipeline_development
+on:
+  push:
+    branches:
+      - dev
+jobs:
+  test-spark-jobs:
+    name: Test and Deploy Spark Jobs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      
+      - name: Configure AWS credentials for GitHub Actions
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      - name: Build Spark Docker image with layer caching
+        run: |
+          docker buildx create --use
+          docker buildx build \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new \
+            --load \
+            -t spark-pipeline-image \
+            .
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+      
+      - name: Build and test images locally
+        run: |
+          # Build validation image
+          docker build -t e_commerce/validation ./scripts/validation
+          
+          # Build staging image
+          docker build -t e_commerce/staging ./scripts/staging
+          
+          # Build kpi_transformation image
+          docker build -t e_commerce/kpi_transformation ./scripts/kpi_transformation
+      
+      - name: Start Spark containers
+        run: docker compose up -d
+      
+      - name: Wait for spark-master container health (fallback sleep)
+        run: |
+          echo "Waiting for spark-master to start..."
+          sleep 20
+      
+      - name: Install Python dependencies inside spark-master
+        run: >
+          docker exec spark-master pip install -r /opt/spark/scripts/../requirements.txt
+      
+      - name: Step 1 - Run file_generator.py
+        run: >
+          docker exec
+          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+          spark-master
+          spark-submit /opt/spark/scripts/file_generator.py
+      
+      - name: Step 2 - Run Validation Container
+        run: >
+          docker run --rm
+          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+          --network container:spark-master
+          -v $(pwd)/data:/app/data
+          e_commerce/validation
+      
+      - name: Step 3 - Run Staging Container
+        run: >
+          docker run --rm
+          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+          --network container:spark-master
+          -v $(pwd)/data:/app/data
+          e_commerce/staging
+      
+      - name: Step 4 - Run KPI Transformation Container
+        run: >
+          docker run --rm
+          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+          --network container:spark-master
+          -v $(pwd)/data:/app/data
+          e_commerce/kpi_transformation
+      
+      - name: Push successful images to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: latest
+        run: |
+          # Tag and push validation image
+          docker tag e_commerce/validation:latest $ECR_REGISTRY/e_commerce/validation:$IMAGE_TAG
+          docker push $ECR_REGISTRY/e_commerce/validation:$IMAGE_TAG
+          docker tag e_commerce/validation:latest $ECR_REGISTRY/e_commerce/validation:${{ github.sha }}
+          docker push $ECR_REGISTRY/e_commerce/validation:${{ github.sha }}
+          
+          # Tag and push staging image
+          docker tag e_commerce/staging:latest $ECR_REGISTRY/e_commerce/staging:$IMAGE_TAG
+          docker push $ECR_REGISTRY/e_commerce/staging:$IMAGE_TAG
+          docker tag e_commerce/staging:latest $ECR_REGISTRY/e_commerce/staging:${{ github.sha }}
+          docker push $ECR_REGISTRY/e_commerce/staging:${{ github.sha }}
+          
+          # Tag and push kpi_transformation image
+          docker tag e_commerce/kpi_transformation:latest $ECR_REGISTRY/e_commerce/kpi_transformation:$IMAGE_TAG
+          docker push $ECR_REGISTRY/e_commerce/kpi_transformation:$IMAGE_TAG
+          docker tag e_commerce/kpi_transformation:latest $ECR_REGISTRY/e_commerce/kpi_transformation:${{ github.sha }}
+          docker push $ECR_REGISTRY/e_commerce/kpi_transformation:${{ github.sha }}
+          
+          echo "All images successfully pushed to ECR!"
+      
+      - name: Stop Spark containers and cleanup
+        if: always()
+        run: docker compose down --volumes

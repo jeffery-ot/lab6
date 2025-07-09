@@ -22,8 +22,7 @@ REQUIRED_COLUMNS = {
 }
 
 CHUNK_SIZE = 10000
-log_stream = StringIO()
-logging.basicConfig(stream=log_stream, level=logging.INFO)
+logging.basicConfig( level=logging.INFO)
 s3 = boto3.client("s3")
 
 # ---------- Utility Functions ----------
@@ -50,10 +49,10 @@ def move_file(key, dest_prefix):
     except (BotoCoreError, ClientError) as e:
         logging.error(f"Failed to move file {key} to {dest_prefix}: {e}")
 
-def upload_log_to_s3(log_content, filename):
+def upload_log_to_s3( filename):
     """Upload in-memory log to S3."""
     try:
-        s3.put_object(Bucket=LANDING_BUCKET, Key=f"{LOG_PREFIX}{filename}", Body=log_content)
+        s3.put_object(Bucket=LANDING_BUCKET, Key=f"{LOG_PREFIX}{filename}")
     except (BotoCoreError, ClientError) as e:
         logging.error(f"Failed to upload log {filename}: {e}")
 
@@ -124,6 +123,7 @@ def process_file_in_chunks(file_key: str, data_type: str) -> bool:
 # ---------- Main Function ----------
 
 def main():
+    print("insode main")
     files = list_files(LANDING_BUCKET, LANDING_PREFIX)
     logging.info(f"Found {len(files)} file(s) in landing zone")
 
@@ -152,7 +152,8 @@ def main():
 
     # Upload logs
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    upload_log_to_s3(log_stream.getvalue(), f"validation_log_{timestamp}.log")
+    upload_log_to_s3( f"validation_log_{timestamp}.log")
 
 if __name__ == "__main__":
     main()
+

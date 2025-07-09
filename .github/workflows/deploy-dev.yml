@@ -1,98 +1,98 @@
-name: data_pipeline_development
+# name: data_pipeline_development
 
-on:
-  push:
-    branches:
-      - dev
+# on:
+#   push:
+#     branches:
+#       - dev
 
-jobs:
-  test-spark-jobs:
-    name: Test and Deploy Spark Jobs
-    runs-on: ubuntu-latest
+# jobs:
+#   test-spark-jobs:
+#     name: Test and Deploy Spark Jobs
+#     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v3
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
+#       - name: Cache Docker layers
+#         uses: actions/cache@v4
+#         with:
+#           path: /tmp/.buildx-cache
+#           key: ${{ runner.os }}-buildx-${{ github.sha }}
+#           restore-keys: |
+#             ${{ runner.os }}-buildx-
 
-      - name: Configure AWS credentials for GitHub Actions
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+#       - name: Configure AWS credentials for GitHub Actions
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
-      - name: Build Spark Docker image with layer caching
-        run: |
-          docker buildx create --use
-          docker buildx build \
-            --cache-from type=local,src=/tmp/.buildx-cache \
-            --cache-to type=local,dest=/tmp/.buildx-cache-new \
-            --load \
-            -t spark-pipeline-image \
-            .
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+#       - name: Build Spark Docker image with layer caching
+#         run: |
+#           docker buildx create --use
+#           docker buildx build \
+#             --cache-from type=local,src=/tmp/.buildx-cache \
+#             --cache-to type=local,dest=/tmp/.buildx-cache-new \
+#             --load \
+#             -t spark-pipeline-image \
+#             .
+#           rm -rf /tmp/.buildx-cache
+#           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-      - name: Start Spark containers
-        run: docker compose up -d
+#       - name: Start Spark containers
+#         run: docker compose up -d
 
-      - name: Wait for spark-master container health (fallback sleep)
-        run: |
-          echo "Waiting for spark-master to start..."
-          sleep 20
+#       - name: Wait for spark-master container health (fallback sleep)
+#         run: |
+#           echo "Waiting for spark-master to start..."
+#           sleep 20
 
-      - name: Install Python dependencies inside spark-master
-        run: >
-          docker exec spark-master pip install -r /opt/spark/scripts/../requirements.txt
+#       - name: Install Python dependencies inside spark-master
+#         run: >
+#           docker exec spark-master pip install -r /opt/spark/scripts/../requirements.txt
 
-      # - name: Step 1 - Run file_generator.py
-      #   run: >
-      #     docker exec
-      #     -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
-      #     spark-master
-      #     spark-submit /opt/spark/scripts/file_generator.py
+#       # - name: Step 1 - Run file_generator.py
+#       #   run: >
+#       #     docker exec
+#       #     -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+#       #     -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#       #     -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+#       #     spark-master
+#       #     spark-submit /opt/spark/scripts/file_generator.py
 
-      # - name: Step 2 - Run initial_validation.py
-      #   run: >
-      #     docker exec
-      #     -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
-      #     spark-master
-      #     spark-submit /opt/spark/scripts/initial_validation.py
+#       # - name: Step 2 - Run initial_validation.py
+#       #   run: >
+#       #     docker exec
+#       #     -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+#       #     -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#       #     -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+#       #     spark-master
+#       #     spark-submit /opt/spark/scripts/initial_validation.py
 
-      # - name: Step 3 - Run stage_to_delta.py
-      #   run: >
-      #     docker exec
-      #     -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
-      #     spark-master
-      #     spark-submit /opt/spark/scripts/stage_to_delta.py
+#       # - name: Step 3 - Run stage_to_delta.py
+#       #   run: >
+#       #     docker exec
+#       #     -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+#       #     -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#       #     -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+#       #     spark-master
+#       #     spark-submit /opt/spark/scripts/stage_to_delta.py
 
 
-      - name: Step 3 - Run kpi Computations
-        run: >
-          docker exec
-          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
-          spark-master
-          spark-submit /opt/spark/scripts/main.py
+#       - name: Step 3 - Run kpi Computations
+#         run: >
+#           docker exec
+#           -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+#           -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           -e AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
+#           spark-master
+#           spark-submit /opt/spark/scripts/main.py
 
-      - name: Stop Spark containers and cleanup
-        if: always()
-        run: docker compose down --volumes
+#       - name: Stop Spark containers and cleanup
+#         if: always()
+#         run: docker compose down --volumes

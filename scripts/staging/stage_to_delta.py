@@ -44,8 +44,8 @@ spark = SparkSession.builder \
     .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
     .getOrCreate()
 
-log_stream = StringIO()
-logging.basicConfig(stream=log_stream, level=logging.INFO)
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 s3 = boto3.client("s3")
 
@@ -73,7 +73,7 @@ def upload_log():
     try:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         log_key = f"{LOG_PREFIX}staging_log_{timestamp}.log"
-        s3.put_object(Bucket=LANDING_BUCKET, Key=log_key, Body=log_stream.getvalue())
+        s3.put_object(Bucket=LANDING_BUCKET, Key=log_key)
         logger.info(f"Log uploaded to {LANDING_BUCKET}/{log_key}")
     except Exception as e:
         logger.error(f"Failed to upload log: {e}")

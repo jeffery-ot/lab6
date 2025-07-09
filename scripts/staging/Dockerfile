@@ -17,6 +17,8 @@ WORKDIR /opt/spark
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+
+COPY . .
 # Install AWS CLI v2
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
     unzip awscliv2.zip && \
@@ -68,3 +70,4 @@ RUN echo "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem" > /op
 
 # Optional: set default user back (commented)
 # USER 1001
+CMD ["spark-submit", "/opt/spark/stage_to_delta.py"]
