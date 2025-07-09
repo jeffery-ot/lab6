@@ -88,6 +88,13 @@ This pipeline processes raw CSV files uploaded to S3 by validating, staging, and
 
 ### 5. Orchestration and Monitoring
 
+![alt text](misc/stepfunctions_graph.png)
+
+
+##### SNS Notif
+
+![alt text](misc/imagesns.png)
+
 * **Orchestration:** AWS Step Function
 
   * Steps: Validation → Staging → KPI Computation
@@ -122,5 +129,4 @@ This pipeline processes raw CSV files uploaded to S3 by validating, staging, and
 
 
 ### CI/CD - GITACTION
-
-![alt text](misc/image copy.png)
+![alt text](misc/image-copy.png)

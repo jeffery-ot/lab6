@@ -1,3 +1,4 @@
 .env
 **/conf
 requirements.txt
+.vscode
