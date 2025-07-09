@@ -103,6 +103,39 @@ This pipeline processes raw CSV files uploaded to S3 by validating, staging, and
 
 ---
 
+
+
+## DynamoDB Table Schemas
+
+### `order_kpis` Table
+
+| Attribute    | Type   | Key Type      |
+| ------------ | ------ | ------------- |
+| `order_date` | String | Partition key |
+
+**Notes:**
+
+* Billing mode: `PAY_PER_REQUEST`
+* All other attributes (e.g., `total_orders`, `total_revenue`, `return_rate`, etc.) are stored as flexible, non-key attributes.
+
+---
+
+### `category_kpis` Table
+
+| Attribute    | Type   | Key Type      |
+| ------------ | ------ | ------------- |
+| `category`   | String | Partition key |
+| `order_date` | String | Sort key      |
+
+**Notes:**
+
+* Billing mode: `PAY_PER_REQUEST`
+* Additional attributes (e.g., `daily_revenue`, `avg_order_value`, `avg_return_rate`, etc.) are stored dynamically per item.
+
+---
+
+
+
 ## Key Features
 
 * **Chunk-wise Validation:** Handles large files efficiently
