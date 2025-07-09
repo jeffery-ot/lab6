@@ -1,0 +1,98 @@
+Comment: Simple ECS pipeline with detailed error notifications via SNS
+StartAt: Run Validation Task
+States:
+  Run Validation Task:
+    Type: Task
+    Resource: arn:aws:states:::ecs:runTask.sync
+    Parameters:
+      LaunchType: FARGATE
+      Cluster: arn:aws:ecs:us-east-1:648637468459:cluster/genuine-hippopotamus-rt9gey
+      TaskDefinition: >-
+        arn:aws:ecs:us-east-1:648637468459:task-definition/ecommerce-validation:2
+      Overrides:
+        ContainerOverrides:
+          - Name: ecommerce-validation
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - subnet-0d220620f2f9ed954
+          SecurityGroups:
+            - sg-076f489898da8e988
+          AssignPublicIp: ENABLED
+    Catch:
+      - ErrorEquals:
+          - States.ALL
+        ResultPath: $.error
+        Next: Notify Validation Failure
+    Next: Run Staging Task
+  Run Staging Task:
+    Type: Task
+    Resource: arn:aws:states:::ecs:runTask.sync
+    Parameters:
+      LaunchType: FARGATE
+      Cluster: arn:aws:ecs:us-east-1:648637468459:cluster/genuine-hippopotamus-rt9gey
+      TaskDefinition: arn:aws:ecs:us-east-1:648637468459:task-definition/ecommerce-staging:1
+      Overrides:
+        ContainerOverrides:
+          - Name: ecommerce-staging
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - subnet-0d220620f2f9ed954
+          SecurityGroups:
+            - sg-076f489898da8e988
+          AssignPublicIp: ENABLED
+    Catch:
+      - ErrorEquals:
+          - States.ALL
+        ResultPath: $.error
+        Next: Notify Staging Failure
+    Next: Run KPI Transformation Task
+  Run KPI Transformation Task:
+    Type: Task
+    Resource: arn:aws:states:::ecs:runTask.sync
+    Parameters:
+      LaunchType: FARGATE
+      Cluster: arn:aws:ecs:us-east-1:648637468459:cluster/genuine-hippopotamus-rt9gey
+      TaskDefinition: >-
+        arn:aws:ecs:us-east-1:648637468459:task-definition/ecommerce-kpi-transformation:1
+      Overrides:
+        ContainerOverrides:
+          - Name: ecommerce-kpi-transformation
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - subnet-0d220620f2f9ed954
+          SecurityGroups:
+            - sg-076f489898da8e988
+          AssignPublicIp: ENABLED
+    Catch:
+      - ErrorEquals:
+          - States.ALL
+        ResultPath: $.error
+        Next: Notify KPI Failure
+    End: true
+  Notify Validation Failure:
+    Type: Task
+    Resource: arn:aws:states:::sns:publish
+    Parameters:
+      TopicArn: arn:aws:sns:us-east-1:648637468459:emart-pipeline
+      Subject: 'ETL Pipeline Failure: Validation Task'
+      Message.$: 'States.Format(''Validation task failed. Error: {}'', $.error)'
+    End: true
+  Notify Staging Failure:
+    Type: Task
+    Resource: arn:aws:states:::sns:publish
+    Parameters:
+      TopicArn: arn:aws:sns:us-east-1:648637468459:emart-pipeline
+      Subject: 'ETL Pipeline Failure: Staging Task'
+      Message.$: 'States.Format(''Staging task failed. Error: {}'', $.error)'
+    End: true
+  Notify KPI Failure:
+    Type: Task
+    Resource: arn:aws:states:::sns:publish
+    Parameters:
+      TopicArn: arn:aws:sns:us-east-1:648637468459:emart-pipeline
+      Subject: 'ETL Pipeline Failure: KPI Transformation Task'
+      Message.$: 'States.Format(''KPI transformation task failed. Error: {}'', $.error)'
+    End: true
