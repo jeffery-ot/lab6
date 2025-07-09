@@ -119,3 +119,8 @@ This pipeline processes raw CSV files uploaded to S3 by validating, staging, and
 
 ---
 
+
+
+### CI/CD - GITACTION
+
+![alt text](misc/image copy.png)
