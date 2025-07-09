@@ -45,6 +45,24 @@ jobs:
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
       
+      - name: Create ECR repositories if they don't exist
+        run: |
+          # Function to create repository if it doesn't exist
+          create_repo_if_not_exists() {
+            local repo_name=$1
+            if ! aws ecr describe-repositories --repository-names $repo_name >/dev/null 2>&1; then
+              echo "Creating ECR repository: $repo_name"
+              aws ecr create-repository --repository-name $repo_name
+            else
+              echo "ECR repository $repo_name already exists"
+            fi
+          }
+          
+          # Create repositories
+          create_repo_if_not_exists "ecommerce-validation"
+          create_repo_if_not_exists "ecommerce-staging"
+          create_repo_if_not_exists "ecommerce-kpi-transformation"
+      
       - name: Build and test images locally
         run: |
           # Build validation image
@@ -113,22 +131,22 @@ jobs:
           IMAGE_TAG: latest
         run: |
           # Tag and push validation image
-          docker tag e_commerce/validation:latest $ECR_REGISTRY/e_commerce/validation:$IMAGE_TAG
-          docker push $ECR_REGISTRY/e_commerce/validation:$IMAGE_TAG
-          docker tag e_commerce/validation:latest $ECR_REGISTRY/e_commerce/validation:${{ github.sha }}
-          docker push $ECR_REGISTRY/e_commerce/validation:${{ github.sha }}
+          docker tag e_commerce/validation:latest $ECR_REGISTRY/ecommerce-validation:$IMAGE_TAG
+          docker push $ECR_REGISTRY/ecommerce-validation:$IMAGE_TAG
+          docker tag e_commerce/validation:latest $ECR_REGISTRY/ecommerce-validation:${{ github.sha }}
+          docker push $ECR_REGISTRY/ecommerce-validation:${{ github.sha }}
           
           # Tag and push staging image
-          docker tag e_commerce/staging:latest $ECR_REGISTRY/e_commerce/staging:$IMAGE_TAG
-          docker push $ECR_REGISTRY/e_commerce/staging:$IMAGE_TAG
-          docker tag e_commerce/staging:latest $ECR_REGISTRY/e_commerce/staging:${{ github.sha }}
-          docker push $ECR_REGISTRY/e_commerce/staging:${{ github.sha }}
+          docker tag e_commerce/staging:latest $ECR_REGISTRY/ecommerce-staging:$IMAGE_TAG
+          docker push $ECR_REGISTRY/ecommerce-staging:$IMAGE_TAG
+          docker tag e_commerce/staging:latest $ECR_REGISTRY/ecommerce-staging:${{ github.sha }}
+          docker push $ECR_REGISTRY/ecommerce-staging:${{ github.sha }}
           
           # Tag and push kpi_transformation image
-          docker tag e_commerce/kpi_transformation:latest $ECR_REGISTRY/e_commerce/kpi_transformation:$IMAGE_TAG
-          docker push $ECR_REGISTRY/e_commerce/kpi_transformation:$IMAGE_TAG
-          docker tag e_commerce/kpi_transformation:latest $ECR_REGISTRY/e_commerce/kpi_transformation:${{ github.sha }}
-          docker push $ECR_REGISTRY/e_commerce/kpi_transformation:${{ github.sha }}
+          docker tag e_commerce/kpi_transformation:latest $ECR_REGISTRY/ecommerce-kpi-transformation:$IMAGE_TAG
+          docker push $ECR_REGISTRY/ecommerce-kpi-transformation:$IMAGE_TAG
+          docker tag e_commerce/kpi_transformation:latest $ECR_REGISTRY/ecommerce-kpi-transformation:${{ github.sha }}
+          docker push $ECR_REGISTRY/ecommerce-kpi-transformation:${{ github.sha }}
           
           echo "All images successfully pushed to ECR!"
       
